@@ -1,0 +1,52 @@
+name: Fork debug build
+
+on:
+  push:
+    branches: [amd-dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-debug-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-2025
+    timeout-minutes: 45
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: 0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust (stable, MSVC)
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustc --version
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('**/Cargo.toml') }}
+          restore-keys: cargo-${{ runner.os }}-
+
+      - name: Build (debug)
+        run: cargo build --workspace
+
+      - name: Upload debug build
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcl-debug-${{ github.run_number }}-${{ github.sha }}
+          path: |
+            target/debug/xcl.exe
+            target/debug/xcl.pdb
+          if-no-files-found: error
+          retention-days: 7
